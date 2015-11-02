@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.yidian.logging</groupId>
+        <artifactId>logging</artifactId>
+        <version>0.1.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>protodef</artifactId>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
+
+    <name>logging proto def</name>
+    <url>http://yidian-inc.com</url>
+    <properties>
+        <ant.contrib.version>1.0b3</ant.contrib.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>2.5.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-lang</groupId>
+            <artifactId>commons-lang</artifactId>
+            <version>2.6</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.thrift</groupId>
+            <artifactId>libthrift</artifactId>
+            <version>0.9.1</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.8.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>${basedir}/src/main/java</sourceDirectory>                                             
+        <testSourceDirectory>${basedir}/src/test</testSourceDirectory> 
+     <plugins>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${basedir}/src/main/gen/thrift/gen-javabean</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                 <dependencies>
+                    <dependency>
+                        <groupId>ant-contrib</groupId>
+                        <artifactId>ant-contrib</artifactId>
+                        <version>${ant.contrib.version}</version>
+                        <exclusions>
+                            <exclusion>
+                                <groupId>ant</groupId>
+                                <artifactId>ant</artifactId>
+                            </exclusion>
+                        </exclusions>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>generate-protobuf-sources</id>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <tasks>
+                                <echo>Building Protobuf</echo>
+                                <delete dir="src/main/gen-java" />
+                                <mkdir dir="src/main/gen-java" />
+                                <path id="proto.path">
+                                    <fileset dir="src/main/proto">
+                                        <include name="**/*.proto" />
+                                    </fileset>
+                                </path>
+                                <pathconvert pathsep=" " property="proto.files"
+                                             refid="proto.path" />
+
+                                <exec executable="protoc" failonerror="true">
+                                    <arg value="--java_out=src/main/gen-java" />
+                                    <arg value="-I${project.basedir}/src/main/proto" />
+                                    <!--arg value="-I${protobuf.home}/include" /-->
+                                    <arg line="${proto.files}" />
+                                </exec>
+                            </tasks>
+                            <sourceRoot>src/main/gen-java</sourceRoot>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+
+                    <execution>
+                        <id>generate-thrift-sources</id>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <tasks>
+                                <echo>Building thrift</echo>
+                                <property name="thrift.args" value="--gen java:beans,private-members,hashcode"/>
+                                <property name="thrift.gen.dir" value="${basedir}/src/main/gen/thrift"/>
+                                <delete dir="${thrift.gen.dir}"/>
+                                <mkdir dir="${thrift.gen.dir}"/>
+                                <taskdef name="for" classname="net.sf.antcontrib.logic.ForTask"
+                                         classpathref="maven.plugin.classpath" />
+                                     <!--path id="thrift.path">
+                                    <fileset dir="src/main/if">
+                                        <include name="**/*.thrift" />
+                                    </fileset>
+                                </path-->
+                                <!--pathconvert pathsep=" " property="thrift.files"
+                                             refid="thrift.path" /-->
+                                <for param="thrift.file">
+                                    <path>
+                                        <fileset dir="src/main/if">
+                                            <include name="**/*.thrift" />
+                                        </fileset>
+                                    </path>
+                                    <sequential>
+                                        <echo message="Generating Thrift code for @{thrift.file}"/>
+                                        <exec executable="thrift"  failonerror="true">
+                                            <arg line="${thrift.args} -o ${thrift.gen.dir} @{thrift.file} " />
+                                            <!--arg line="${thrift.args} -I ${basedir}/include -I ${basedir}/.. -o ${thrift.gen.dir} @{thrift.file} " /-->
+                                        </exec>
+                                    </sequential>
+                                </for>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+        <pluginManagement>
+        	<plugins>
+        		<!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+        		<plugin>
+        			<groupId>org.eclipse.m2e</groupId>
+        			<artifactId>lifecycle-mapping</artifactId>
+        			<version>1.0.0</version>
+        			<configuration>
+        				<lifecycleMappingMetadata>
+        					<pluginExecutions>
+        						<pluginExecution>
+        							<pluginExecutionFilter>
+        								<groupId>
+        									org.apache.maven.plugins
+        								</groupId>
+        								<artifactId>
+        									maven-antrun-plugin
+        								</artifactId>
+        								<versionRange>
+        									[1.3,)
+        								</versionRange>
+        								<goals>
+        									<goal>run</goal>
+        								</goals>
+        							</pluginExecutionFilter>
+        							<action>
+        								<ignore></ignore>
+        							</action>
+        						</pluginExecution>
+        					</pluginExecutions>
+        				</lifecycleMappingMetadata>
+        			</configuration>
+        		</plugin>
+        	</plugins>
+        </pluginManagement>
+    </build>
+</project>
